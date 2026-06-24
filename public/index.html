@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚽ World Cup Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="header-brand">
+        <span class="header-icon">⚽</span>
+        <div>
+          <h1 class="header-title">WORLD CUP SIMULATOR</h1>
+          <p class="header-subtitle">What-If Tournament Simulator</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <button class="nav-link active" data-page="standings" onclick="showPage('standings')">
+        <span class="nav-icon">🏆</span>
+        <span class="nav-label">Klasemen</span>
+      </button>
+      <button class="nav-link" data-page="schedule" onclick="showPage('schedule')">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">Jadwal & Hasil</span>
+      </button>
+      <button class="nav-link" data-page="bracket" onclick="showPage('bracket')">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">Bracket</span>
+      </button>
+      <button class="nav-link" data-page="admin" onclick="showPage('admin')">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Admin</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- Standings Page -->
+    <section id="page-standings" class="page active">
+      <div class="page-header">
+        <h2 class="page-title">🏆 Klasemen Grup</h2>
+        <p class="page-desc">Klasemen fase grup berdasarkan hasil pertandingan</p>
+      </div>
+      <div id="standings-container" class="standings-container">
+        <div class="loading">Memuat klasemen...</div>
+      </div>
+    </section>
+
+    <!-- Schedule Page -->
+    <section id="page-schedule" class="page">
+      <div class="page-header">
+        <h2 class="page-title">📅 Jadwal & Hasil</h2>
+        <p class="page-desc">Semua pertandingan fase grup dan knockout</p>
+      </div>
+      <div class="filters">
+        <div class="filter-group">
+          <label class="filter-label">Fase:</label>
+          <select id="filter-phase" class="filter-select" onchange="loadSchedule()">
+            <option value="">Semua</option>
+            <option value="group">Fase Grup</option>
+            <option value="knockout">Knockout</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Status:</label>
+          <select id="filter-status" class="filter-select" onchange="loadSchedule()">
+            <option value="">Semua</option>
+            <option value="scheduled">Terjadwal</option>
+            <option value="finished">Selesai</option>
+          </select>
+        </div>
+      </div>
+      <div id="schedule-container" class="schedule-container">
+        <div class="loading">Memuat jadwal...</div>
+      </div>
+    </section>
+
+    <!-- Bracket Page -->
+    <section id="page-bracket" class="page">
+      <div class="page-header">
+        <h2 class="page-title">🎯 Bracket Knockout</h2>
+        <p class="page-desc">Bracket fase knockout sistem gugur</p>
+      </div>
+      <div id="bracket-container" class="bracket-container">
+        <div class="loading">Memuat bracket...</div>
+      </div>
+    </section>
+
+    <!-- Admin Page -->
+    <section id="page-admin" class="page">
+      <div class="page-header">
+        <h2 class="page-title">⚙️ Admin Panel</h2>
+        <p class="page-desc">Kelola turnamen, input hasil pertandingan</p>
+      </div>
+
+      <!-- Login Section -->
+      <div id="admin-login" class="admin-section">
+        <div class="card">
+          <h3 class="card-title">🔐 Login Admin</h3>
+          <div class="form-row">
+            <input type="password" id="admin-password" class="form-input" placeholder="Masukkan password admin">
+            <button class="btn btn-primary" onclick="handleLogin()">Login</button>
+          </div>
+          <div id="login-status" class="status-msg"></div>
+        </div>
+      </div>
+
+      <!-- Admin Panel (hidden until login) -->
+      <div id="admin-panel" class="admin-section" style="display: none;">
+
+        <!-- Status -->
+        <div class="card">
+          <div class="admin-status">
+            <span class="status-badge status-ok">✅ Logged in as admin</span>
+            <button class="btn btn-sm btn-outline" onclick="handleLogout()">Logout</button>
+          </div>
+        </div>
+
+        <!-- Add Team -->
+        <div class="card">
+          <h3 class="card-title">➕ Tambah Tim</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Nama Tim</label>
+              <input type="text" id="team-name" class="form-input" placeholder="e.g. Brazil">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kode Tim</label>
+              <input type="text" id="team-code" class="form-input" placeholder="e.g. BRA" maxlength="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Grup</label>
+              <select id="team-group" class="form-input">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+                <option value="G">G</option>
+                <option value="H">H</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="handleAddTeam()">Tambah Tim</button>
+          <div id="team-status" class="status-msg"></div>
+        </div>
+
+        <!-- Input Match Result -->
+        <div class="card">
+          <h3 class="card-title">📝 Input Hasil Pertandingan</h3>
+          <div class="form-group">
+            <label class="form-label">Pilih Pertandingan</label>
+            <select id="match-select" class="form-input"></select>
+          </div>
+          <div class="form-grid form-grid-3">
+            <div class="form-group">
+              <label class="form-label" id="score-label-a">Skor Tim A</label>
+              <input type="number" id="score-a" class="form-input" min="0" placeholder="0">
+            </div>
+            <div class="form-group score-vs">
+              <span class="vs-text">VS</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" id="score-label-b">Skor Tim B</label>
+              <input type="number" id="score-b" class="form-input" min="0" placeholder="0">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="handleSubmitResult()">Submit Hasil</button>
+          <div id="result-status" class="status-msg"></div>
+        </div>
+
+        <!-- Tournament Controls -->
+        <div class="card">
+          <h3 class="card-title">🏟️ Kontrol Turnamen</h3>
+          <div class="btn-group">
+            <button class="btn btn-accent" onclick="handleSetupTournament()">
+              🏟️ Setup Fase Grup
+            </button>
+            <button class="btn btn-accent" onclick="handleAdvanceKnockout()">
+              ⏩ Advance ke Knockout
+            </button>
+            <button class="btn btn-danger" onclick="handleResetTournament()">
+              🔄 Reset Turnamen
+            </button>
+          </div>
+          <div id="tournament-status" class="status-msg"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/pages/standings.js"></script>
+  <script src="/js/pages/schedule.js"></script>
+  <script src="/js/pages/bracket.js"></script>
+  <script src="/js/pages/admin.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

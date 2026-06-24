@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String   @unique @db.VarChar(10)
+  group     String   @db.VarChar(10)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  matchesAsTeamA Match[] @relation("TeamA")
+  matchesAsTeamB Match[] @relation("TeamB")
+
+  @@index([group])
+}
+
+model Match {
+  id         Int      @id @default(autoincrement())
+  teamAId    Int?                     // null = TBD (belum diketahui)
+  teamBId    Int?                     // null = TBD (belum diketahui)
+  scoreA     Int?                     // null = belum dimainkan
+  scoreB     Int?                     // null = belum dimainkan
+  phase      String   @default("group") @db.VarChar(20) // "group" | "knockout"
+  status     String   @default("scheduled") @db.VarChar(20) // "scheduled" | "finished"
+  round      Int?                     // 1, 2, 3 untuk grup; 1=QF, 2=SF, 3=Final untuk knockout
+  bracketPos String?  @db.VarChar(10) // e.g. "QF1", "SF1", "F"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  teamA Team? @relation("TeamA", fields: [teamAId], references: [id])
+  teamB Team? @relation("TeamB", fields: [teamBId], references: [id])
+
+  @@index([phase])
+  @@index([status])
+  @@index([phase, status])
+}
