@@ -83,14 +83,20 @@ async function updateMatchResult(matchId, { scoreA, scoreB }) {
 /**
  * Propagate winner ke match babak berikutnya
  */
+/**
+ * Propagate winner ke match babak berikutnya & loser ke perebutan juara 3 jika semifinal
+ */
 async function propagateWinner(match, prisma) {
   console.log("========== PROPAGATE ==========");
   console.log("Bracket Pos:", match.bracketPos);
   console.log(`Skor: ${match.scoreA} - ${match.scoreB}`);
 
-  // Menentukan pemenang berdasarkan skor lapangan
+  // 1. Tentukan Pemenang dan Pecundang
   const winnerId = match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
+  const loserId = match.scoreA > match.scoreB ? match.teamBId : match.teamAId;
+
   console.log("Winner ID =", winnerId);
+  console.log("Loser ID =", loserId);
 
   const nextMatchMapping = {
     R16_1: { bracketPos: "QF1", side: "teamAId" },
@@ -116,40 +122,47 @@ async function propagateWinner(match, prisma) {
   };
 
   const next = nextMatchMapping[match.bracketPos];
-  if (!next) return; // Babak Final, tidak ada ronde lanjutan
+  
+  // Jika tidak ada next mapping dan bukan perebutan juara 3, berarti ini pertandingan FINAL / THIRD itu sendiri
+  if (!next) return; 
 
   console.log(`${match.bracketPos} -> ${next.bracketPos} (${next.side})`);
 
-  // 1. Cari pertandingan spesifik yang akan menerima tim pemenang
+  // 2. Update Pemenang ke Babak Berikutnya (QF, SF, atau FINAL)
   const nextMatch = await prisma.match.findFirst({
     where: {
       bracketPos: next.bracketPos,
       phase: "knockout",
-      // Catatan: Jika ada sistem tournamentId, tambahkan di sini: tournamentId: match.tournamentId
     },
   });
 
-  if (!nextMatch) {
-    console.log(
-      `Target pertandingan (${next.bracketPos}) belum di-generate atau tidak ditemukan.`,
-    );
-    return;
+  if (nextMatch) {
+    await prisma.match.update({
+      where: { id: nextMatch.id },
+      data: { [next.side]: winnerId },
+    });
+    console.log(`Berhasil mengirim pemenang ke ${next.bracketPos}`);
   }
 
-  // 2. Update menggunakan ID unik hasil pencarian di atas
-  const updatedNextMatch = await prisma.match.update({
-    where: {
-      id: nextMatch.id,
-    },
-    data: {
-      [next.side]: winnerId,
-    },
-  });
+  // 3. TAMBAHKAN LOGIKA INI: Jika pertandingan yang selesai adalah Semifinal, kirim pecundang ke babak THIRD
+  if (match.bracketPos === "SF1" || match.bracketPos === "SF2") {
+    const thirdPlaceSide = match.bracketPos === "SF1" ? "teamAId" : "teamBId";
+    
+    const thirdMatch = await prisma.match.findFirst({
+      where: {
+        bracketPos: "THIRD",
+        phase: "knockout",
+      },
+    });
 
-  console.log(
-    "Berhasil memperbarui babak berikutnya:",
-    updatedNextMatch.bracketPos,
-  );
+    if (thirdMatch) {
+      await prisma.match.update({
+        where: { id: thirdMatch.id },
+        data: { [thirdPlaceSide]: loserId },
+      });
+      console.log(`Berhasil mengirim tim kalah (${loserId}) ke babak THIRD posisi ${thirdPlaceSide}`);
+    }
+  }
 }
 
 module.exports = { getAllMatches, updateMatchResult };
