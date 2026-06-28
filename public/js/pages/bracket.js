@@ -1,11 +1,11 @@
 // Bracket Page — Knockout Bracket
 
 async function loadBracket() {
-  const container = document.getElementById('bracket-container');
+  const container = document.getElementById("bracket-container");
   container.innerHTML = '<div class="loading">Memuat bracket...</div>';
 
   try {
-    const data = await api.get('/bracket');
+    const data = await api.get("/bracket");
 
     if (!data.rounds || data.rounds.length === 0) {
       container.innerHTML = `
@@ -22,7 +22,6 @@ async function loadBracket() {
     }
 
     container.innerHTML = renderBracket(data);
-
   } catch (err) {
     container.innerHTML = `
       <div class="bracket-empty">
@@ -34,81 +33,105 @@ async function loadBracket() {
 }
 
 function renderBracket(data) {
-  const rounds = data.rounds;
+  const grouped = {
+    "Round of 16": [],
+    "Quarter Final": [],
+    "Semi Final": [],
+    "Third Place": [],
+    Final: [],
+  };
+
+  data.rounds.forEach((match) => {
+    if (match.round === 1) grouped["Round of 16"].push(match);
+    else if (match.round === 2) grouped["Quarter Final"].push(match);
+    else if (match.round === 3) grouped["Semi Final"].push(match);
+    else if (match.round === 4) grouped["Third Place"].push(match);
+    else if (match.round === 5) grouped["Final"].push(match);
+  });
+
   let html = '<div class="bracket">';
 
-  for (let i = 0; i < rounds.length; i++) {
-    const round = rounds[i];
+  const rounds = Object.entries(grouped).filter(
+    ([_, matches]) => matches.length,
+  );
+
+  rounds.forEach(([title, matches], index) => {
     html += `
-      <div class="bracket-round">
-        <div class="bracket-round-header">${round.name}</div>
-        ${round.matches.map(m => renderBracketMatch(m)).join('')}
-      </div>
+        <div class="bracket-round">
+            <div class="bracket-round-header">${title}</div>
+            ${matches.map(renderBracketMatch).join("")}
+        </div>
     `;
 
-    // Add connector column between rounds
-    if (i < rounds.length - 1) {
-      html += '<div class="bracket-connector"></div>';
+    if (index < rounds.length - 1) {
+      html += `<div class="bracket-connector"></div>`;
     }
-  }
+  });
 
-  // Champion section
-  const finalRound = rounds[rounds.length - 1];
-  const finalMatch = finalRound?.matches[finalRound.matches.length - 1];
-  let championName = 'TBD';
-  let isTbd = true;
+  // Champion
+  const finalMatch = grouped["Final"][0];
 
-  if (finalMatch && finalMatch.status === 'finished') {
-    championName = finalMatch.scoreA > finalMatch.scoreB
-      ? finalMatch.teamA.name
-      : finalMatch.teamB.name;
-    isTbd = false;
+  let champion = "TBD";
+
+  if (
+    finalMatch &&
+    finalMatch.status === "finished" &&
+    finalMatch.teamA &&
+    finalMatch.teamB
+  ) {
+    champion =
+      finalMatch.scoreA > finalMatch.scoreB
+        ? finalMatch.teamA.name
+        : finalMatch.teamB.name;
   }
 
   html += `
-    <div class="bracket-connector"></div>
     <div class="bracket-champion">
       <div class="champion-trophy">🏆</div>
       <div class="champion-label">Champion</div>
-      <div class="champion-name ${isTbd ? 'tbd' : ''}">${championName}</div>
+      <div class="champion-name">${champion}</div>
     </div>
   `;
 
-  html += '</div>';
+  html += "</div>";
+
   return html;
 }
 
 function renderBracketMatch(match) {
-  const teamA = match.teamA || { name: 'TBD', code: '???' };
-  const teamB = match.teamB || { name: 'TBD', code: '???' };
-  const isFinished = match.status === 'finished';
+  const teamA = match.teamA || { name: "TBD", code: "???" };
+  const teamB = match.teamB || { name: "TBD", code: "???" };
+  const isFinished = match.status === "finished";
 
-  let aClass = '';
-  let bClass = '';
+  let aClass = "";
+  let bClass = "";
 
   if (isFinished) {
     if (match.scoreA > match.scoreB) {
-      aClass = 'winner';
-      bClass = 'loser';
+      aClass = "winner";
+      bClass = "loser";
     } else if (match.scoreB > match.scoreA) {
-      bClass = 'winner';
-      aClass = 'loser';
+      bClass = "winner";
+      aClass = "loser";
     }
   }
 
-  const aIsTbd = teamA.name === 'TBD' || teamA.code === 'TBD' || teamA.code === '???';
-  const bIsTbd = teamB.name === 'TBD' || teamB.code === 'TBD' || teamB.code === '???';
+  const aIsTbd =
+    teamA.name === "TBD" || teamA.code === "TBD" || teamA.code === "???";
+  const bIsTbd =
+    teamB.name === "TBD" || teamB.code === "TBD" || teamB.code === "???";
 
   return `
     <div class="bracket-match">
       <div class="bracket-match-team ${aClass}">
-        <span class="team-name ${aIsTbd ? 'tbd' : ''}">${teamA.name}</span>
-        <span class="team-score">${isFinished ? match.scoreA : ''}</span>
+        <span class="team-name ${aIsTbd ? "tbd" : ""}">${teamA.name}</span>
+        <span class="team-score">${isFinished ? match.scoreA : ""}</span>
       </div>
       <div class="bracket-match-team ${bClass}">
-        <span class="team-name ${bIsTbd ? 'tbd' : ''}">${teamB.name}</span>
-        <span class="team-score">${isFinished ? match.scoreB : ''}</span>
+        <span class="team-name ${bIsTbd ? "tbd" : ""}">${teamB.name}</span>
+        <span class="team-score">${isFinished ? match.scoreB : ""}</span>
       </div>
     </div>
   `;
 }
+document.addEventListener("DOMContentLoaded", loadBracket);

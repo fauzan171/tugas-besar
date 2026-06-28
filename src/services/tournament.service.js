@@ -1,5 +1,8 @@
 const prisma = require("../lib/prisma");
-const { calculateStandings, generateRoundRobin } = require("../utils/standings");
+const {
+  calculateStandings,
+  generateRoundRobin,
+} = require("../utils/standings");
 
 async function setupGroupStage() {
   // Cek apakah jadwal grup sudah ada
@@ -45,7 +48,7 @@ async function setupGroupStage() {
   for (const [group, groupTeams] of Object.entries(groupsMap)) {
     const pairs = generateRoundRobin(groupTeams);
 
-    // Assign round numbers (simple: sequential)
+    // Assign round numbers (sequential)
     const matchData = pairs.map((pair, index) => ({
       teamAId: pair.teamAId,
       teamBId: pair.teamBId,
@@ -62,7 +65,7 @@ async function setupGroupStage() {
     data: {
       message: "Jadwal fase grup berhasil dibuat",
       matchesCreated: totalCreated,
-    },
+    }, // <-- Titik koma nakal sudah dibuang dan disarangkan dengan benar
     status: 200,
   };
 }
@@ -103,8 +106,14 @@ async function advanceToKnockout() {
   const standingsByGroup = {};
   for (const group of groups) {
     const groupTeams = teams.filter((t) => t.group === group);
+
+    // Ambil match jika teamA ATAU teamB yang berada di grup tersebut
     const matches = await prisma.match.findMany({
-      where: { phase: "group", status: "finished", teamA: { group } },
+      where: {
+        phase: "group",
+        status: "finished",
+        OR: [{ teamA: { group: group } }, { teamB: { group: group } }],
+      },
     });
     standingsByGroup[group] = calculateStandings(matches, groupTeams);
   }
@@ -113,7 +122,7 @@ async function advanceToKnockout() {
   const qualified = [];
   for (const group of groups) {
     const sorted = standingsByGroup[group];
-    if (sorted.length < 2) {
+    if (!sorted || sorted.length < 2) {
       return {
         error: `Grup ${group} harus memiliki minimal 2 tim untuk fase knockout`,
         status: 400,
@@ -139,136 +148,173 @@ async function advanceToKnockout() {
 }
 
 function generateKnockoutMatches(qualified) {
-  const matches = [];
-  const numTeams = qualified.length;
+  const get = (group, rank) => {
+    const found = qualified.find((t) => t.group === group && t.rank === rank);
+    return found ? found.teamId : null;
+  };
 
-  // Bracket pairing:
-  // 1A vs 2B, 1C vs 2D, ... (atas)
-  // 1B vs 2A, 1D vs 2C, ... (bawah)
-  const half = numTeams / 2;
-
-  for (let i = 0; i < half; i++) {
-    const team1 = qualified[i]; // 1st place dari grup ke-i
-    const team2 = qualified[numTeams - 1 - i]; // 2nd place dari grup terakhir-i
-
-    matches.push({
-      teamAId: team1.teamId,
-      teamBId: team2.teamId,
+  return [
+    // =========================
+    // ROUND OF 16
+    // =========================
+    {
+      teamAId: get("A", 1),
+      teamBId: get("B", 2),
       phase: "knockout",
       status: "scheduled",
       round: 1,
-      bracketPos: `QF${i + 1}`,
-    });
-  }
+      bracketPos: "R16_1",
+    },
+    {
+      teamAId: get("C", 1),
+      teamBId: get("D", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_2",
+    },
+    {
+      teamAId: get("E", 1),
+      teamBId: get("F", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_3",
+    },
+    {
+      teamAId: get("G", 1),
+      teamBId: get("H", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_4",
+    },
+    {
+      teamAId: get("B", 1),
+      teamBId: get("A", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_5",
+    },
+    {
+      teamAId: get("D", 1),
+      teamBId: get("C", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_6",
+    },
+    {
+      teamAId: get("F", 1),
+      teamBId: get("E", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_7",
+    },
+    {
+      teamAId: get("H", 1),
+      teamBId: get("G", 2),
+      phase: "knockout",
+      status: "scheduled",
+      round: 1,
+      bracketPos: "R16_8",
+    },
 
-  // Semi-finals (placeholder)
-  const numSF = half / 2;
-  for (let i = 0; i < numSF; i++) {
-    matches.push({
+    // =========================
+    // QUARTER FINAL
+    // =========================
+    {
       teamAId: null,
       teamBId: null,
       phase: "knockout",
       status: "scheduled",
       round: 2,
-      bracketPos: `SF${i + 1}`,
-    });
-  }
+      bracketPos: "QF1",
+    },
+    {
+      teamAId: null,
+      teamBId: null,
+      phase: "knockout",
+      status: "scheduled",
+      round: 2,
+      bracketPos: "QF2",
+    },
+    {
+      teamAId: null,
+      teamBId: null,
+      phase: "knockout",
+      status: "scheduled",
+      round: 2,
+      bracketPos: "QF3",
+    },
+    {
+      teamAId: null,
+      teamBId: null,
+      phase: "knockout",
+      status: "scheduled",
+      round: 2,
+      bracketPos: "QF4",
+    },
 
-  // Finals (2 legs or 1 — let's do 2 legs: F1, F2)
-  // Actually for simplicity, let's do 2 semifinal winners → 1 final
-  // But to handle 4 SFs, let's do F1 (SF1 vs SF2), F2 (SF3 vs SF4)
-  if (numSF > 2) {
-    // 2 final bracket positions
-    matches.push({
+    // =========================
+    // SEMIFINAL
+    // =========================
+    {
       teamAId: null,
       teamBId: null,
       phase: "knockout",
       status: "scheduled",
       round: 3,
-      bracketPos: "F1",
-    });
-    matches.push({
+      bracketPos: "SF1",
+    },
+    {
       teamAId: null,
       teamBId: null,
       phase: "knockout",
       status: "scheduled",
       round: 3,
-      bracketPos: "F2",
-    });
-    // Grand Final
-    matches.push({
+      bracketPos: "SF2",
+    },
+
+    // =========================
+    // 3RD PLACE
+    // =========================
+    {
       teamAId: null,
       teamBId: null,
       phase: "knockout",
       status: "scheduled",
       round: 4,
-      bracketPos: "FINAL",
-    });
-  } else {
-    // Just 2 SFs → 1 Final
-    matches.push({
+      bracketPos: "THIRD",
+    },
+
+    // =========================
+    // FINAL
+    // =========================
+    {
       teamAId: null,
       teamBId: null,
       phase: "knockout",
       status: "scheduled",
-      round: 3,
+      round: 5,
       bracketPos: "FINAL",
-    });
-  }
-
-  return matches;
+    },
+  ];
 }
 
 async function getBracket() {
   const matches = await prisma.match.findMany({
     where: { phase: "knockout" },
-    include: {
-      teamA: { select: { id: true, name: true, code: true } },
-      teamB: { select: { id: true, name: true, code: true } },
-    },
-    orderBy: [{ round: "asc" }, { bracketPos: "asc" }],
+    include: { teamA: true, teamB: true },
+    orderBy: [{ round: "asc" }, { id: "asc" }],
   });
 
-  if (matches.length === 0) {
-    return {
-      data: { message: "Fase knockout belum dimulai", rounds: [] },
-      status: 200,
-    };
-  }
-
-  // Group by round
-  const roundNames = {
-    1: "Quarter-final",
-    2: "Semi-final",
-    3: "Final",
-    4: "Grand Final",
+  return {
+    status: 200,
+    data: { rounds: matches },
   };
-
-  const roundsMap = {};
-  for (const match of matches) {
-    const roundKey = match.round;
-    if (!roundsMap[roundKey]) {
-      roundsMap[roundKey] = {
-        round: roundKey,
-        name: roundNames[roundKey] || `Round ${roundKey}`,
-        matches: [],
-      };
-    }
-
-    roundsMap[roundKey].matches.push({
-      id: match.id,
-      teamA: match.teamA || { name: "TBD", code: "TBD" },
-      teamB: match.teamB || { name: "TBD", code: "TBD" },
-      scoreA: match.scoreA,
-      scoreB: match.scoreB,
-      status: match.status,
-      bracketPos: match.bracketPos,
-    });
-  }
-
-  const rounds = Object.values(roundsMap).sort((a, b) => a.round - b.round);
-
-  return { data: { phase: "knockout", rounds }, status: 200 };
 }
 
 async function resetTournament() {
